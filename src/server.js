@@ -7,6 +7,7 @@ const morgan = require('morgan');
 const projectsRoutes = require('./routes/projects');
 const buildersRoutes = require('./routes/builders');
 const authRoutes = require('./routes/auth');
+const { authenticate } = require('./routes/auth');
 
 const app = express();
 

@@ -222,4 +222,5 @@ router.post('/builder-register-step2/:uid', async (req, res, next) => {
   }
 });
 
-module.exports = {router, authenticate};
+module.exports = router;
+module.exports.authenticate = authenticate;
