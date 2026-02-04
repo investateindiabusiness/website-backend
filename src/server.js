@@ -6,7 +6,6 @@ const morgan = require('morgan');
 
 const projectsRoutes = require('./routes/projects');
 const buildersRoutes = require('./routes/builders');
-const inquiriesRoutes = require('./routes/inquiries');
 const authRoutes = require('./routes/auth');
 
 const app = express();
@@ -29,7 +28,6 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/projects', projectsRoutes);
 app.use('/api/builders', buildersRoutes);
-app.use('/api/inquiries', inquiriesRoutes);
 app.use('/api/auth', authRoutes);
 
 // Basic error handler
