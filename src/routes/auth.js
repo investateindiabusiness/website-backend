@@ -222,5 +222,76 @@ router.post('/builder-register-step2/:uid', async (req, res, next) => {
   }
 });
 
+router.post('/admin-login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // 1. Basic Validation
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
+
+    // 2. Verify credentials using Google Identity Toolkit (Firebase REST API)
+    const verifyPasswordUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`;
+    
+    const authResponse = await fetch(verifyPasswordUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        returnSecureToken: true
+      })
+    });
+
+    const authData = await authResponse.json();
+
+    if (!authResponse.ok) {
+      throw new Error(authData.error?.message || 'Authentication failed');
+    }
+
+    const uid = authData.localId;
+
+    // 3. Fetch user details from Firestore
+    const userDoc = await db.collection('users').doc(uid).get();
+
+    if (!userDoc.exists) {
+      return res.status(403).json({ message: 'Access Denied: User record not found.' });
+    }
+
+    const userData = userDoc.data();
+
+    // 4. STRICT ROLE CHECK
+    // If the password is correct but the role is NOT admin, deny access.
+    if (userData.role !== 'admin') {
+      return res.status(403).json({ 
+        message: 'Access Denied: You do not have administrator privileges.' 
+      });
+    }
+
+    // 5. Success - Return token and admin data
+    res.json({
+      uid: uid,
+      email: authData.email,
+      role: userData.role, // This will be 'admin'
+      name: userData.fullName || 'Administrator',
+      token: authData.idToken,
+      refreshToken: authData.refreshToken
+    });
+
+  } catch (error) {
+    console.error("Admin Login Error:", error.message);
+    
+    let message = "Login failed";
+    // Provide specific feedback for credential errors
+    if (error.message.includes('INVALID_PASSWORD')) message = "Incorrect password";
+    if (error.message.includes('EMAIL_NOT_FOUND')) message = "Email not found";
+    
+    // Return 401 for Auth failures (credential issues), 
+    // note that Role failures are handled above with 403.
+    res.status(401).json({ message });
+  }
+});
+
 module.exports = router;
 module.exports.authenticate = authenticate;
