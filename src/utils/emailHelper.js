@@ -1,39 +1,26 @@
-const nodemailer = require('nodemailer');
-
 // Read config from env
-const EMAIL_HOST = process.env.EMAIL_HOST || '';
-const EMAIL_PORT = process.env.EMAIL_PORT || '587';
-const EMAIL_USER = process.env.EMAIL_USER || '';
 const EMAIL_PASS = process.env.EMAIL_PASS || '';
-const EMAIL_FROM = process.env.EMAIL_FROM || 'noreply@investateindia.com';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'Investate India <support@investateindia.com>';
 
-let transporter = null;
+let fromAddress = "support@investateindia.com";
+let fromName = "Investate India";
 
-// Initialize transporter if env values are provided
-if (EMAIL_HOST && EMAIL_USER && EMAIL_PASS) {
-  try {
-    transporter = nodemailer.createTransport({
-      host: EMAIL_HOST,
-      port: parseInt(EMAIL_PORT, 10),
-      secure: EMAIL_PORT === '465', // true for 465, false for other ports
-      auth: {
-        user: EMAIL_USER,
-        pass: EMAIL_PASS,
-      },
-      connectionTimeout: 5000,
-      greetingTimeout: 5000,
-      socketTimeout: 5000,
-    });
-    console.log('[EmailHelper] SMTP transporter configured successfully.');
-  } catch (err) {
-    console.error('[EmailHelper] SMTP configuration failed:', err.message);
-  }
+const fromMatch = EMAIL_FROM.match(/^(.*?)\s*<(.+)>$/);
+if (fromMatch) {
+  fromName = fromMatch[1].replace(/['"]/g, '').trim();
+  fromAddress = fromMatch[2].trim();
+} else if (EMAIL_FROM) {
+  fromAddress = EMAIL_FROM;
+}
+
+if (!EMAIL_PASS) {
+  console.log('[EmailHelper] EMAIL_PASS missing. Operating in Mock console mode.');
 } else {
-  console.log('[EmailHelper] SMTP credentials missing. Operating in Mock console mode.');
+  console.log('[EmailHelper] ZeptoMail REST API configured successfully.');
 }
 
 /**
- * Send an email
+ * Send an email using ZeptoMail REST API (Bypasses SMTP port blocks)
  * @param {string} to
  * @param {string} subject
  * @param {string} text
@@ -42,18 +29,41 @@ if (EMAIL_HOST && EMAIL_USER && EMAIL_PASS) {
 const sendMail = async (to, subject, text, html = '') => {
   if (!to) return;
 
-  if (transporter) {
+  if (EMAIL_PASS) {
     try {
-      await transporter.sendMail({
-        from: EMAIL_FROM,
-        to,
-        subject,
-        text,
-        html: html || text,
+      const response = await fetch('https://api.zeptomail.in/v1.1/email', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Zoho-enczapikey ${EMAIL_PASS}`
+        },
+        body: JSON.stringify({
+          from: {
+            address: fromAddress,
+            name: fromName
+          },
+          to: [
+            {
+              email_address: {
+                address: to,
+                name: to.split('@')[0]
+              }
+            }
+          ],
+          subject: subject,
+          htmlbody: html || text
+        })
       });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(`ZeptoMail API Error: ${JSON.stringify(data)}`);
+      }
       console.log(`[EmailHelper] Email sent successfully to ${to} for: "${subject}"`);
     } catch (err) {
       console.error(`[EmailHelper] Failed to send email to ${to}:`, err.message);
+      throw err;
     }
   } else {
     // Console log fallback

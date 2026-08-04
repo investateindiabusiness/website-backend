@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { getDb } = require('./src/firebase');
+const { sendMail } = require('./src/utils/emailHelper');
 
 async function testFirebase() {
   console.log('Testing Firebase connection...');
@@ -13,9 +14,8 @@ async function testFirebase() {
 }
 
 async function testEmail() {
-  console.log('Testing Email connection...');
+  console.log('Testing Email connection via emailHelper...');
   try {
-    const { sendMail } = require('./src/utils/emailHelper');
     await sendMail('test@example.com', 'Test Email', 'This is a test');
     console.log('Email sent successfully!');
   } catch (err) {
