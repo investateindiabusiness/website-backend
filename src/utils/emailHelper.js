@@ -20,6 +20,9 @@ if (EMAIL_HOST && EMAIL_USER && EMAIL_PASS) {
         user: EMAIL_USER,
         pass: EMAIL_PASS,
       },
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 5000,
     });
     console.log('[EmailHelper] SMTP transporter configured successfully.');
   } catch (err) {
