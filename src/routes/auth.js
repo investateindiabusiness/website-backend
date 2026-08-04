@@ -134,31 +134,33 @@ router.post('/send-otp', async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes from now
 
-    // Save to Firestore
-    await db.collection('otps').doc(email.toLowerCase()).set({
+    // Prepare email HTML
+    const { sendMail, buildTemplate } = require('../utils/emailHelper');
+    const html = buildTemplate(
+      'Email Verification OTP',
+      `
+        <p>Thank you for initiating registration with <strong>Investate India</strong>.</p>
+        <p>Please use the following 6-digit verification code to complete your registration:</p>
+        <div style="font-size: 26px; font-weight: 800; color: #0b264f; letter-spacing: 4px; padding: 14px; border-radius: 8px; background-color: #f1f5f9; text-align: center; margin: 20px 0; border: 1px solid #e2e8f0; font-family: monospace;">
+          ${otp}
+        </div>
+        <p>This code is valid for <strong>10 minutes</strong>. If you did not request this code, please ignore this email.</p>
+      `
+    );
+
+    // Save to Firestore and Send Email concurrently to save time
+    const saveToDb = db.collection('otps').doc(email.toLowerCase()).set({
       otp,
       expiresAt,
       createdAt: new Date().toISOString()
     });
 
-    // Send OTP via Email
-    try {
-      const { sendMail, buildTemplate } = require('../utils/emailHelper');
-      const html = buildTemplate(
-        'Email Verification OTP',
-        `
-          <p>Thank you for initiating registration with <strong>Investate India</strong>.</p>
-          <p>Please use the following 6-digit verification code to complete your registration:</p>
-          <div style="font-size: 26px; font-weight: 800; color: #0b264f; letter-spacing: 4px; padding: 14px; border-radius: 8px; background-color: #f1f5f9; text-align: center; margin: 20px 0; border: 1px solid #e2e8f0; font-family: monospace;">
-            ${otp}
-          </div>
-          <p>This code is valid for <strong>10 minutes</strong>. If you did not request this code, please ignore this email.</p>
-        `
-      );
-      await sendMail(email, 'Verify Your Email Address - Investate India', `Your verification code is: ${otp}`, html);
-    } catch (emailErr) {
-      console.error('[Auth Route] Failed to send verification OTP email:', emailErr.message);
-    }
+    const sendEmailTask = sendMail(email, 'Verify Your Email Address - Investate India', `Your verification code is: ${otp}`, html)
+      .catch(emailErr => {
+        console.error('[Auth Route] Failed to send verification OTP email:', emailErr.message);
+      });
+
+    await Promise.all([saveToDb, sendEmailTask]);
 
     res.status(200).json({ success: true, message: 'Verification OTP code sent to your email.' });
   } catch (err) {
